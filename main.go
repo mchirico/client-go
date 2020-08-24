@@ -1,13 +1,101 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	v1 "k8s.io/api/core/v1"
 	metaV1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"log"
 	"os"
-	"context"
+	"time"
 )
+
+func PodWatch() {
+	const shortDuration = 60 * time.Minute
+
+	d := time.Now().Add(shortDuration)
+	ctx, cancel := context.WithDeadline(context.Background(), d)
+	defer cancel()
+
+	// Location of kubeconfig file
+	kubeconfig := os.Getenv("HOME") + "/.kube/config"
+
+	// Create a Config (k8s.io/client-go/rest)
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Create an API Clientset (k8s.io/client-go/kubernetes)
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// Create a CoreV1Client (k8s.io/client-go/kubernetes/typed/core/v1)
+	coreV1Client := clientset.CoreV1()
+	// Create an AppsV1Client (k8s.io/client-go/kubernetes/typed/apps/v1)
+
+
+
+
+	namespace := "default"
+	name := "name3"
+	event := &v1.Event{
+		TypeMeta:            metaV1.TypeMeta{},
+		ObjectMeta:          metaV1.ObjectMeta{Namespace: namespace,Name: name},
+		InvolvedObject:      v1.ObjectReference{},
+		Reason:              "Some silly reason",
+		Message:             "Message... some random message here... ",
+		Source:              v1.EventSource{},
+		FirstTimestamp:      metaV1.Time{time.Now()},
+		LastTimestamp:       metaV1.Time{ time.Now().Add(-78 * time.Minute)},
+		Count:               10,
+		Type:                "Special",
+		EventTime:           metaV1.MicroTime{},
+		Series:              nil,
+		Action:              "Dropped jaw",
+		Related:             nil,
+		ReportingController: "A Giant Panda",
+		ReportingInstance:   "",
+	}
+	_ , err = coreV1Client.Events(namespace).Create(ctx, event , metaV1.CreateOptions{})
+
+	event.Action = "Smile"
+	coreV1Client.Events(namespace).Update(ctx,event,metaV1.UpdateOptions{})
+
+
+
+	if err != nil {
+		coreV1Client.Events(namespace).Delete(ctx, name , metaV1.DeleteOptions{})
+		log.Fatal(err.Error())
+	}
+
+	go func() {
+		time.Sleep(7 * time.Second)
+		err = coreV1Client.Events(namespace).Delete(ctx, name , metaV1.DeleteOptions{})
+	}()
+
+
+	watch, err := coreV1Client.Events("").Watch(ctx, metaV1.ListOptions{})
+
+	//watch, err := coreV1Client.Pods("").Watch(ctx, metaV1.ListOptions{})
+
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	go func() {
+		for event := range watch.ResultChan() {
+			fmt.Printf("Type: %v\n", event.Type)
+			fmt.Printf("Event: %v\n", event)
+
+		}
+	}()
+	time.Sleep(60 * time.Minute)
+
+}
 
 func main() {
 
@@ -38,7 +126,7 @@ func main() {
 	// Get a *PodList (k8s.io/api/core/v1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pods, err := coreV1Client.Pods("").List(ctx,metaV1.ListOptions{})
+	pods, err := coreV1Client.Pods("").List(ctx, metaV1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -53,7 +141,7 @@ func main() {
 	//-------------------------------------------------------------------------//
 
 	// Get a *NodeList (k8s.io/api/core/v1)
-	nodes, err := coreV1Client.Nodes().List(ctx,metaV1.ListOptions{})
+	nodes, err := coreV1Client.Nodes().List(ctx, metaV1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -68,7 +156,7 @@ func main() {
 	//-------------------------------------------------------------------------//
 
 	// Get a *DeploymentList (k8s.io/api/apps/v1)
-	deployments, err := appsV1Client.Deployments("").List(ctx,metaV1.ListOptions{})
+	deployments, err := appsV1Client.Deployments("").List(ctx, metaV1.ListOptions{})
 	if err != nil {
 		panic(err.Error())
 	}
@@ -77,5 +165,11 @@ func main() {
 	for i, deployment := range deployments.Items {
 		fmt.Printf("Deployment %d: %s\n", i+1, deployment.ObjectMeta.Name)
 	}
+
+	fmt.Printf("\n\nGetting Ready to run watch:\nCtl-c to kill\n\n")
+	time.Sleep(2 * time.Second)
+	fmt.Printf("")
+
+	PodWatch()
 
 }
