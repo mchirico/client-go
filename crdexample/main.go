@@ -18,13 +18,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	cachev1alpha1 "github.com/mchirico/memcached-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	cachev1alpha1 "github.com/mchirico/memcached-operator/api/v1alpha1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -58,7 +58,6 @@ func main() {
 		panic(err)
 	}
 
-
 	deploymentsClient := clientset.AppsV1().Deployments(apiv1.NamespaceDefault)
 
 	const (
@@ -77,12 +76,24 @@ func main() {
 		Namespace: namespace,
 	}
 
-
 	crd := &cachev1alpha1.Memcached{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Memcached",
+			APIVersion: "cache.example.com/v1alpha1",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.Name,
 			Namespace: key.Namespace,
 		},
+		Status: cachev1alpha1.MemcachedStatus{},
+	}
+
+	resultCRD := &cachev1alpha1.Memcached{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.Name,
+			Namespace: key.Namespace,
+		},
+		Status: cachev1alpha1.MemcachedStatus{},
 	}
 
 	crd.Kind = kind
@@ -91,23 +102,66 @@ func main() {
 	crd.Spec = cachev1alpha1.MemcachedSpec{}
 	crd.Spec.Size = 7
 
-
 	var k8sClient client.Client
 
 	err = cachev1alpha1.AddToScheme(scheme.Scheme)
 	//Scheme: scheme.Scheme
 	k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
-    fmt.Printf("Big moment... going to create\n")
+	fmt.Printf("Load CRD\n")
 	prompt()
 	err = k8sClient.Create(ctx, crd)
 	if err != nil {
-		fmt.Errorf("error: %w\n",err)
+		fmt.Errorf("error: %w\n", err)
 	}
-	fmt.Printf("Created\n")
+	for i := 0; i < 4; i++ {
+		err = k8sClient.Get(ctx, key, resultCRD)
+		if err != nil {
+			fmt.Errorf("error: %w\n", err)
+		}
+		fmt.Printf("crd.Status.Nodes: %d\n", len(crd.Status.Nodes))
+		time.Sleep(1 * time.Second)
+	}
+
+	fmt.Printf("Now Update CRD to 2\n")
 	prompt()
 
+	crd.Spec.Size = 2
+	err = k8sClient.Update(ctx, crd)
+	if err != nil {
+		fmt.Errorf("error: %w\n", err)
+	}
+	for i := 0; i < 7; i++ {
+		err = k8sClient.Get(ctx, key, resultCRD)
+		if err != nil {
+			fmt.Errorf("error: %w\n", err)
+		}
+		fmt.Printf("crd.Status.Nodes: %d\n", len(crd.Status.Nodes))
+		time.Sleep(1 * time.Second)
+	}
 
+	fmt.Printf("Now change to 12")
+	prompt()
+	crd.Spec.Size = 12
+	err = k8sClient.Update(ctx, crd)
+	if err != nil {
+		fmt.Errorf("error: %w\n", err)
+	}
+	// We won't get change immediately?
+	for i := 0; i < 7; i++ {
+		err = k8sClient.Get(ctx, key, resultCRD)
+		if err != nil {
+			fmt.Errorf("error: %w\n", err)
+		}
+		fmt.Printf("crd.Status.Nodes: %d\n", len(crd.Status.Nodes))
+		time.Sleep(1 * time.Second)
+	}
 
+	fmt.Printf("Now Delete CRD\n")
+	prompt()
+	err = k8sClient.Delete(ctx, crd)
+	if err != nil {
+		fmt.Errorf("error: %w\n", err)
+	}
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -148,7 +202,6 @@ func main() {
 	// Create Deployment
 	//fmt.Println("Creating crd deployment...")
 	//result, err := deploymentsClient.Create(context.TODO(), memcached, metav1.CreateOptions{})
-
 
 	// Create Deployment
 	fmt.Println("Creating deployment...")
