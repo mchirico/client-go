@@ -107,6 +107,7 @@ func main() {
 	err = cachev1alpha1.AddToScheme(scheme.Scheme)
 	//Scheme: scheme.Scheme
 	k8sClient, err = client.New(config, client.Options{Scheme: scheme.Scheme})
+
 	fmt.Printf("Load CRD\n")
 	prompt()
 	err = k8sClient.Create(ctx, crd)
@@ -121,6 +122,8 @@ func main() {
 		fmt.Printf("crd.Status.Nodes: %d\n", len(crd.Status.Nodes))
 		time.Sleep(1 * time.Second)
 	}
+
+
 
 	fmt.Printf("Now Update CRD to 2\n")
 	prompt()
