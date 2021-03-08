@@ -78,8 +78,33 @@ func WatchExperiment() {
 		err = coreV1Client.Events(namespace).Delete(ctx, name , metav1.DeleteOptions{})
 	}()
 
+/*
+By hand
 
-	watch, err := coreV1Client.Events("").Watch(ctx, metav1.ListOptions{})
+Need to get a list?
+
+   k describe events
+
+  k get events -A --field-selector involvedObject.kind=Environment
+
+
+
+   watch, err := coreV1Client.Events("").Watch(ctx, metav1.ListOptions{
+   		FieldSelector: "involvedObject.name=environment-sample",
+   	})
+
+Other options
+
+   watch, err := coreV1Client.Events("").Watch(ctx, metav1.ListOptions{
+      		FieldSelector: "involvedObject.name=environment-sample",
+      	})
+
+ */
+
+	watch, err := coreV1Client.Events("").Watch(ctx, metav1.ListOptions{
+		FieldSelector: "involvedObject.name=environment-sample",
+
+	})
 
 	//watch, err := coreV1Client.Pods("").Watch(ctx, metav1.ListOptions{})
 
