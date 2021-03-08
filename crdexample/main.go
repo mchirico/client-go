@@ -13,6 +13,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"os"
 	"path/filepath"
@@ -39,6 +40,20 @@ import (
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	// _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 )
+
+
+type Mpatch struct {}
+
+func (p Mpatch)Type() types.PatchType {
+	return types.MergePatchType
+
+}
+func (p Mpatch)Data(obj runtime.Object) ([]byte, error){
+     return  []byte(`'{"spec":{"size": 1}}'`),nil
+}
+
+
+
 
 func main() {
 	var kubeconfig *string
@@ -128,7 +143,7 @@ func main() {
 	fmt.Printf("Now Update CRD to 2\n")
 	prompt()
 
-	crd.Spec.Size = 2
+    crd.Spec.Size = 2
 	err = k8sClient.Update(ctx, crd)
 	if err != nil {
 		fmt.Errorf("error: %w\n", err)
